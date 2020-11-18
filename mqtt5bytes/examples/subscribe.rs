@@ -1,5 +1,5 @@
 use bytes::BytesMut;
-use mqtt5bytes::{mqtt_read, Connect, Error, Packet, Publish, QoS};
+use mqtt5bytes::{mqtt_read, Connect, Error, Packet, Publish, QoS, Subscribe};
 use std::io;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -15,6 +15,7 @@ async fn main() {
     let packet = client.read().await.unwrap();
     println!("{:?}", packet);
 
+    // TODO: create a subscription
     for i in 1..=100 {
         let mut publish = Publish::new("hello/world", QoS::AtLeastOnce, "hello foss");
         publish.set_pkid(i);
@@ -23,6 +24,7 @@ async fn main() {
         println!("{:?}", packet);
         time::delay_for(Duration::from_secs(1)).await;
     }
+   
 }
 
 pub struct Client {
@@ -76,6 +78,7 @@ impl Client {
             Packet::PubAck(packet) => packet.write(&mut self.write)?,
             Packet::PubRec(packet) => packet.write(&mut self.write)?,
             Packet::PubComp(packet) => packet.write(&mut self.write)?,
+            Packet::Subscribe(packet) => packet.write(&mut self.write)?,
             _ => todo!(),
         };
 
