@@ -107,6 +107,7 @@ impl Subscribe {
 pub struct SubscribeProperties {
     pub id: Option<u32>,
     pub user_properties: Vec<(String, String)>,
+    pub reason_string: Option<String>,
 }
 
 impl SubscribeProperties {
@@ -127,9 +128,12 @@ impl SubscribeProperties {
     pub fn extract(mut bytes: &mut Bytes) -> Result<Option<SubscribeProperties>, Error> {
         let mut reason_string = None;
         let mut user_properties = Vec::new();
+        let mut id = None;
+
 
         let (properties_len_len, properties_len) = length(bytes.iter())?;
         bytes.advance(properties_len_len);
+        id = Some(bytes.get_u32());
         if properties_len == 0 {
             return Ok(None);
         }
@@ -157,6 +161,7 @@ impl SubscribeProperties {
         }
 
         Ok(Some(SubscribeProperties {
+            id,
             reason_string,
             user_properties,
         }))
