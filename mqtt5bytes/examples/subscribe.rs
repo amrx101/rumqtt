@@ -16,6 +16,8 @@ async fn main() {
     println!("{:?}", packet);
 
     // TODO: create a subscription
+    let sub = Subscribe::new("hello/world", QoS::AtLeastOnce);
+    client.write(Packet::Subscribe(sub)).await.unwrap();
     for i in 1..=100 {
         let mut publish = Publish::new("hello/world", QoS::AtLeastOnce, "hello foss");
         publish.set_pkid(i);

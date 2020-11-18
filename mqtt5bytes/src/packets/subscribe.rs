@@ -130,7 +130,6 @@ impl SubscribeProperties {
         let mut user_properties = Vec::new();
         let mut id = None;
 
-
         let (properties_len_len, properties_len) = length(bytes.iter())?;
         bytes.advance(properties_len_len);
         id = Some(bytes.get_u32());
