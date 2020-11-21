@@ -15,6 +15,13 @@ pub struct Subscribe {
 
 impl Subscribe {
     pub(crate) fn assemble(fixed_header: FixedHeader, mut bytes: Bytes) -> Result<Self, Error> {
+        // Following steps are done.
+        //Read packet id
+        //Read Subscription Properties
+            // -> Read identifier.
+            // -> Read user properties.
+            // -> Read string.
+        // Read payload to collect topics
         let variable_header_index = fixed_header.fixed_len;
         let pkid = bytes.get_u16();  // should we read this after advancing the cursor? PDF is vague about this.
         bytes.advance(variable_header_index);
@@ -132,7 +139,7 @@ impl SubscribeProperties {
 
         let (properties_len_len, properties_len) = length(bytes.iter())?;
         bytes.advance(properties_len_len);
-        // id = Some(bytes.get_u32());
+        id = Some(bytes.get_u32());
         if properties_len == 0 {
             return Ok(None);
         }
