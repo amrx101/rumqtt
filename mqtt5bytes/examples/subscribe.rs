@@ -17,6 +17,11 @@ async fn main() {
     let sub = Subscribe::new("hello/world", QoS::AtLeastOnce);
    
     let mut new_cli = Client::new().await;
+    task::spawn(async move {
+        client.write(Packet::Subscribe(sub)).await.unwrap();
+        time::delay_for(Duration::from_secs(3)).await;
+    });
+    
     for i in 1..=10 {
         let mut publish = Publish::new("hello/world", QoS::AtLeastOnce, "hello foss");
         publish.set_pkid(i);
@@ -26,15 +31,7 @@ async fn main() {
         time::delay_for(Duration::from_secs(1)).await;
     }
 
-    task::spawn(async move {
-        client.write(Packet::Subscribe(sub)).await.unwrap();
-        time::delay_for(Duration::from_secs(3)).await;
-    });
-    loop {}
-    // TODO: create a subscription
    
-    
-    
    
 }
 
