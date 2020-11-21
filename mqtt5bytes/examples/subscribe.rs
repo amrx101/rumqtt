@@ -3,7 +3,7 @@ use mqtt5bytes::{mqtt_read, Connect, Error, Packet, Publish, QoS, Subscribe};
 use std::io;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio::time;
+use tokio::{time, task};
 use tokio::time::Duration;
 
 #[tokio::main(core_threads = 2)]
@@ -14,18 +14,27 @@ async fn main() {
     client.write(connect).await.unwrap();
     let packet = client.read().await.unwrap();
     println!("{:?}", packet);
-
-    // TODO: create a subscription
     let sub = Subscribe::new("hello/world", QoS::AtLeastOnce);
-    client.write(Packet::Subscribe(sub)).await.unwrap();
-    for i in 1..=100 {
+   
+    let mut new_cli = Client::new().await;
+    for i in 1..=10 {
         let mut publish = Publish::new("hello/world", QoS::AtLeastOnce, "hello foss");
         publish.set_pkid(i);
-        client.write(Packet::Publish(publish)).await.unwrap();
-        let packet = client.read().await.unwrap();
+        new_cli.write(Packet::Publish(publish)).await.unwrap();
+        let packet = new_cli.read().await.unwrap();
         println!("{:?}", packet);
         time::delay_for(Duration::from_secs(1)).await;
     }
+
+    task::spawn(async move {
+        client.write(Packet::Subscribe(sub)).await.unwrap();
+        time::delay_for(Duration::from_secs(3)).await;
+    });
+    loop {}
+    // TODO: create a subscription
+   
+    
+    
    
 }
 
