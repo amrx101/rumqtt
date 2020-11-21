@@ -1,25 +1,23 @@
 [package]
 name = "rumqttlog"
-version = "0.1.2"
+version = "0.3.0"
 authors = ["tekjar <raviteja@bytebeam.io>"]
 edition = "2018"
 license = "Apache-2.0"
+keywords = ["mqtt", "iot", "kafka", "nats", "distributed"]
 description = "kafka inspired rumqtt's mqtt commitlog"
 
 [dependencies]
 byteorder = "1"
 memmap = "0.7"
-bytes = "0.5"
-confy = "0.4"
-mqtt4bytes = { path = "../mqtt4bytes", version = "0.1" }
-async-channel = "1.4"
-tokio = { version = "0.2", features = ["full"] }
-serde = { version = "1", features = ["derive"] }
-indexmap = "1"
+bytes = "0.6"
+mqtt4bytes = { path = "../mqtt4bytes", version = "0.4" }
+tokio = { version = "0.3.2", features = ["full"] }
+serde = { version = "1", features = ["derive", "rc"] }
 thiserror = "1"
 log = "0.4"
-intmap = "0.7"
 fnv = "1"
+jackiechan = "0.0.2"
 
 [dev-dependencies]
 argh = "0.1"
@@ -31,7 +29,6 @@ rand = "0.7"
 bencher = "0.1"
 pretty_env_logger = "0.4"
 futures-util = "0.3.5"
-file-per-thread-logger = "0.1"
 
 [[bench]]
 name = "bench"

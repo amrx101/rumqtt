@@ -1,6 +1,7 @@
 //! A pure rust MQTT client which strives to be robust, efficient and easy to use.
-//! This library is backed by an async (tokio) eventloop which handles all the robustness and
-//! and efficiency parts of MQTT but naturally fits into both sync and async worlds as we'll see
+//! This library is backed by an async (tokio) eventloop which handles all the
+//! robustness and and efficiency parts of MQTT but naturally fits into both sync
+//! and async worlds as we'll see
 //!
 //! Let's jump into examples right away
 //!
@@ -8,69 +9,92 @@
 //! ----------------------------
 //!
 //! ```no_run
-//!use rumqttc::{MqttOptions, Client, QoS};
-//!use std::time::Duration;
-//!use std::thread;
+//! use rumqttc::{MqttOptions, Client, QoS};
+//! use std::time::Duration;
+//! use std::thread;
 //!
-//! fn main() {
-//!     let mut mqttoptions = MqttOptions::new("rumqtt-sync-client", "test.mosquitto.org", 1883);
-//!     mqttoptions.set_keep_alive(5);
+//! let mut mqttoptions = MqttOptions::new("rumqtt-sync", "test.mosquitto.org", 1883);
+//! mqttoptions.set_keep_alive(5);
 //!
-//!     let (mut client, mut connection) = Client::new(mqttoptions, 10);
-//!     client.subscribe("hello/rumqtt", QoS::AtMostOnce).unwrap();
-//!     thread::spawn(move || for i in 0..10 {
-//!        client.publish("hello/rumqtt", QoS::AtLeastOnce, false, vec![i; i as usize]).unwrap();
-//!        thread::sleep(Duration::from_millis(100));
-//!     });
+//! let (mut client, mut connection) = Client::new(mqttoptions, 10);
+//! client.subscribe("hello/rumqtt", QoS::AtMostOnce).unwrap();
+//! thread::spawn(move || for i in 0..10 {
+//!    client.publish("hello/rumqtt", QoS::AtLeastOnce, false, vec![i; i as usize]).unwrap();
+//!    thread::sleep(Duration::from_millis(100));
+//! });
 //!
-//!     // Iterate to poll the eventloop for connection progress
-//!     for (i, notification) in connection.iter().enumerate() {
-//!         println!("Notification = {:?}", notification);
-//!     }
+//! // Iterate to poll the eventloop for connection progress
+//! for (i, notification) in connection.iter().enumerate() {
+//!     println!("Notification = {:?}", notification);
 //! }
 //! ```
-//!
-//! What's happening behind the scenes
-//! - Eventloop orchestrates user requests and incoming packets concurrently and hadles the state
-//! - Ping the broker when necessary and detects client side half open connections as well
-//! - Throttling of outgoing packets
-//! - Queue size based flow control on outgoing packets
-//! - Automatic reconnections
-//! - Natural backpressure to the client during slow network
-//!
-//! In short, everything necessary to maintain a robust connection
-//!
-//! **NOTE**: Looping on `connection.iter()` is necessary to run the eventloop. It yields both
-//! incoming and outgoing activity notifications which allows customization as user sees fit.
-//! Blocking here will block connection progress
 //!
 //! A simple asynchronous publish and subscribe
 //! ------------------------------
+//!
 //! ```no_run
-//! use rumqttc::{MqttOptions, Request, EventLoop};
+//! use rumqttc::{MqttOptions, AsyncClient, QoS};
+//! use tokio::{task, time};
 //! use std::time::Duration;
 //! use std::error::Error;
 //!
-//! #[tokio::main(core_threads = 1)]
-//! async fn main() {
-//!     let mut mqttoptions = MqttOptions::new("rumqtt-async", "test.mosquitto.org", 1883);
-//!     let mut eventloop = EventLoop::new(mqttoptions, 10);
-//!     let requests_tx = eventloop.handle();
+//! # #[tokio::main(worker_threads = 1)]
+//! # async fn main() {
+//! let mut mqttoptions = MqttOptions::new("rumqtt-async", "test.mosquitto.org", 1883);
+//! mqttoptions.set_keep_alive(5);
 //!
-//!     loop {
-//!         let notification = eventloop.poll().await.unwrap();
-//!         println!("Received = {:?}", notification);
-//!         tokio::time::delay_for(Duration::from_secs(1)).await;
+//! let (mut client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
+//! client.subscribe("hello/rumqtt", QoS::AtMostOnce).await.unwrap();
+//!
+//! task::spawn(async move {
+//!     for i in 0..10 {
+//!         client.publish("hello/rumqtt", QoS::AtLeastOnce, false, vec![i; i as usize]).await.unwrap();
+//!         time::sleep(Duration::from_millis(100)).await;
 //!     }
-//! }
-//! ```
-//! - Reconnects if polled again after an error
-//! - User handle to send requests is just a channel
+//! });
 //!
-//! Since eventloop is externally polled (with `iter()/poll()` in a loop) out side the library, users can
+//! loop {
+//!     let notification = eventloop.poll().await.unwrap();
+//!     println!("Received = {:?}", notification);
+//!     tokio::time::sleep(Duration::from_secs(1)).await;
+//! }
+//! # }
+//! ```
+//!
+//! Quick overview of features
+//! - Eventloop orchestrates outgoing/incoming packets concurrently and hadles the state
+//! - Pings the broker when necessary and detects client side half open connections as well
+//! - Throttling of outgoing packets (todo)
+//! - Queue size based flow control on outgoing packets
+//! - Automatic reconnections by just continuing the `eventloop.poll()/connection.iter()` loop`
+//! - Natural backpressure to client APIs during bad network
+//! - Immediate cancellation with `client.cancel()`
+//!
+//! In short, everything necessary to maintain a robust connection
+//!
+//! Since the eventloop is externally polled (with `iter()/poll()` in a loop)
+//! out side the library and `Eventloop` is accessible, users can
 //! - Distribute incoming messages based on topics
 //! - Stop it when required
 //! - Access internal state for use cases like graceful shutdown or to modify options before reconnection
+//!
+//! ## Important notes
+//!
+//! - Looping on `connection.iter()`/`eventloop.poll()` is necessary to run the
+//!   event loop and make progress. It yields incoming and outgoing activity
+//!   notifications which allows customization as you see fit.
+//!
+//! - Blocking inside the `connection.iter()`/`eventloop.poll()` loop will block
+//!   connection progress.
+//!
+//! ## FAQ
+//! **Connecting to a broker using raw ip doesn't work**
+//!
+//! You cannot create a TLS connection to a bare IP address with a self-signed
+//! certificate. This is a [limitation of rustls](https://github.com/ctz/rustls/issues/184).
+//! One workaround, which only works under *nix/BSD-like systems, is to add an
+//! entry to wherever your DNS resolver looks (e.g. `/etc/hosts`) for the bare IP
+//! address and use that name in your code.
 
 #[macro_use]
 extern crate log;
@@ -86,10 +110,8 @@ mod state;
 mod tls;
 
 pub use async_channel::{SendError, Sender, TrySendError};
-pub use client::{Client, ClientError, Connection};
-pub use eventloop::{ConnectionError, EventLoop};
-#[cfg(feature = "passthrough")]
-pub use framed::Network;
+pub use client::{AsyncClient, Client, ClientError, Connection};
+pub use eventloop::{ConnectionError, Event, EventLoop};
 pub use mqtt4bytes::*;
 pub use state::{MqttState, StateError};
 pub use tokio_rustls::rustls::internal::pemfile::{certs, pkcs8_private_keys, rsa_private_keys};
@@ -102,33 +124,29 @@ pub type Incoming = Packet;
 pub enum Outgoing {
     /// Publish packet with packet identifier. 0 implies QoS 0
     Publish(u16),
-    /// Publishes
-    Publishes(Vec<u16>),
     /// Subscribe packet with packet identifier
     Subscribe(u16),
     /// Unsubscribe packet with packet identifier
     Unsubscribe(u16),
     /// PubAck packet
     PubAck(u16),
-    /// PubAck packet
-    PubAcks(Vec<u16>),
     /// PubRec packet
     PubRec(u16),
+    /// PubRel packet
+    PubRel(u16),
     /// PubComp packet
     PubComp(u16),
     /// Ping request packet
     PingReq,
+    /// Ping response packet
+    PingResp,
     /// Disconnect packet
     Disconnect,
 }
 
 /// Requests by the client to mqtt event loop. Request are
-/// handled one by one. This is a duplicate of possible MQTT
-/// packets along with the ability to tag data and do bulk
-/// operations.
-/// Upcoming feature: When 'manual' feature is turned on
-/// provides the ability to reply with acks when the user sees fit
-#[derive(Debug)]
+/// handled one by one.
+#[derive(Clone, Debug, PartialEq)]
 pub enum Request {
     Publish(Publish),
     PublishRaw(PublishRaw),
@@ -143,12 +161,10 @@ pub enum Request {
     Unsubscribe(Unsubscribe),
     UnsubAck(UnsubAck),
     Disconnect,
-    Publishes(Vec<Publish>),
-    PubAcks(Vec<PubAck>),
 }
 
 /// Key type for TLS authentication
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Key {
     RSA,
     ECC,
@@ -156,24 +172,24 @@ pub enum Key {
 
 impl From<Publish> for Request {
     fn from(publish: Publish) -> Request {
-        return Request::Publish(publish);
+        Request::Publish(publish)
     }
 }
 
 impl From<Subscribe> for Request {
     fn from(subscribe: Subscribe) -> Request {
-        return Request::Subscribe(subscribe);
+        Request::Subscribe(subscribe)
     }
 }
 
 impl From<Unsubscribe> for Request {
     fn from(unsubscribe: Unsubscribe) -> Request {
-        return Request::Unsubscribe(unsubscribe);
+        Request::Unsubscribe(unsubscribe)
     }
 }
 
 /// Client authentication option for mqtt connect packet
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SecurityOptions {
     /// No authentication.
     None,
@@ -181,10 +197,6 @@ pub enum SecurityOptions {
     UsernamePassword(String, String),
 }
 
-// TODO: Should all the options be exposed as public? Drawback
-// would be loosing the ability to panic when the user options
-// are wrong (e.g empty client id) or aggressive (keep alive time)
-/// Options to configure the behaviour of mqtt connection
 #[derive(Clone)]
 pub struct MqttOptions {
     /// broker address that you want to connect to
@@ -227,7 +239,8 @@ pub struct MqttOptions {
     key_type: Key,
     /// Injected rustls ClientConfig for TLS, to allow more customisation.
     tls_client_config: Option<Arc<ClientConfig>>,
-
+    /// Enabling will wait for incoming packets to avoid collisions
+    collision_safety: bool,
     conn_timeout: u64,
 }
 
@@ -258,6 +271,7 @@ impl MqttOptions {
             last_will: None,
             key_type: Key::RSA,
             tls_client_config: None,
+            collision_safety: false,
             conn_timeout: 5,
         }
     }
@@ -272,7 +286,7 @@ impl MqttOptions {
         self
     }
 
-    pub fn last_will(&mut self) -> Option<LastWill> {
+    pub fn last_will(&self) -> Option<LastWill> {
         self.last_will.clone()
     }
 
@@ -457,6 +471,15 @@ impl MqttOptions {
     /// Get the ClientConfig which was previously set, if any.
     pub fn tls_client_config(&self) -> Option<Arc<ClientConfig>> {
         self.tls_client_config.clone()
+    }
+
+    pub fn set_collision_safety(&mut self, c: bool) -> &mut Self {
+        self.collision_safety = c;
+        self
+    }
+
+    pub fn collision_safety(&self) -> bool {
+        self.collision_safety
     }
 
     /// set connection timeout in secs

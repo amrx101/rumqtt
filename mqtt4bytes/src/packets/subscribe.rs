@@ -1,6 +1,7 @@
 use super::*;
 use crate::*;
 use alloc::string::String;
+use alloc::vec;
 use alloc::vec::Vec;
 use bytes::{Buf, Bytes};
 use core::fmt;
@@ -13,6 +14,38 @@ pub struct Subscribe {
 }
 
 impl Subscribe {
+    pub fn new<S: Into<String>>(topic: S, qos: QoS) -> Subscribe {
+        let topic = SubscribeTopic {
+            topic_path: topic.into(),
+            qos,
+        };
+
+        Self::new_many(vec![topic])
+    }
+
+    pub fn empty_subscribe() -> Subscribe {
+        Self::new_many(None)
+    }
+
+    pub fn new_many<T>(topics: T) -> Subscribe
+    where
+        T: IntoIterator<Item = SubscribeTopic>,
+    {
+        Subscribe {
+            pkid: 0,
+            topics: topics.into_iter().collect(),
+        }
+    }
+
+    pub fn add(&mut self, topic: String, qos: QoS) -> &mut Self {
+        let topic = SubscribeTopic {
+            topic_path: topic,
+            qos,
+        };
+        self.topics.push(topic);
+        self
+    }
+
     pub(crate) fn assemble(fixed_header: FixedHeader, mut bytes: Bytes) -> Result<Self, Error> {
         let variable_header_index = fixed_header.fixed_len;
         bytes.advance(variable_header_index);
@@ -37,47 +70,27 @@ impl Subscribe {
         Ok(subscribe)
     }
 
-    pub fn new<S: Into<String>>(topic: S, qos: QoS) -> Subscribe {
-        let topic = SubscribeTopic {
-            topic_path: topic.into(),
-            qos,
-        };
-
-        let mut topics = Vec::new();
-        topics.push(topic);
-        Subscribe { pkid: 0, topics }
-    }
-
-    pub fn empty_subscribe() -> Subscribe {
-        Subscribe {
-            pkid: 0,
-            topics: Vec::new(),
-        }
-    }
-
-    pub fn add(&mut self, topic: String, qos: QoS) -> &mut Self {
-        let topic = SubscribeTopic {
-            topic_path: topic,
-            qos,
-        };
-        self.topics.push(topic);
-        self
-    }
-
-    pub fn write(&self, payload: &mut BytesMut) -> Result<usize, Error> {
-        let remaining_len = 2 + self
+    fn len(&self) -> usize {
+        let len = 2 + self
             .topics
             .iter()
             .fold(0, |s, ref t| s + t.topic_path.len() + 3);
-        payload.put_u8(0x82);
-        let remaining_len_bytes = write_remaining_length(payload, remaining_len)?;
-        payload.put_u16(self.pkid);
+
+        len
+    }
+
+    pub fn write(&self, buffer: &mut BytesMut) -> Result<usize, Error> {
+        let len = self.len();
+        buffer.reserve(len);
+        buffer.put_u8(0x82);
+        let count = write_remaining_length(buffer, len)?;
+        buffer.put_u16(self.pkid);
         for topic in self.topics.iter() {
-            write_mqtt_string(payload, topic.topic_path.as_str());
-            payload.put_u8(topic.qos as u8);
+            write_mqtt_string(buffer, topic.topic_path.as_str());
+            buffer.put_u8(topic.qos as u8);
         }
 
-        Ok(1 + remaining_len_bytes + remaining_len)
+        Ok(1 + count + len)
     }
 }
 
@@ -88,12 +101,18 @@ pub struct SubscribeTopic {
     pub qos: QoS,
 }
 
+impl SubscribeTopic {
+    pub fn new(topic_path: String, qos: QoS) -> Self {
+        Self { topic_path, qos }
+    }
+}
+
 impl fmt::Debug for Subscribe {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Filters = {:?}, Packet id = {:?}",
-            self.pkid, self.topics
+            self.topics, self.pkid
         )
     }
 }

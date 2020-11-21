@@ -1,13 +1,13 @@
-use rumqttc::{self, EventLoop, Incoming, MqttOptions, PublishRaw, QoS, Request};
+use rumqttc::*;
 use std::error::Error;
 use std::time::{Duration, Instant};
 
-use async_channel::Sender;
 use tokio::task;
 use tokio::time;
 
 mod common;
 
+#[cfg(not(target_env = "msvc"))]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
@@ -22,40 +22,31 @@ async fn main() {
 pub async fn start(id: &str, payload_size: usize, count: usize) -> Result<(), Box<dyn Error>> {
     let mut mqttoptions = MqttOptions::new(id, "localhost", 1883);
     mqttoptions.set_keep_alive(20);
-
-    // NOTE More the inflight size, better the perf
-    mqttoptions.set_inflight(1000);
+    mqttoptions.set_inflight(100);
     mqttoptions.set_max_request_batch(10);
 
-    let mut eventloop = EventLoop::new(mqttoptions, 10);
-    let requests_tx = eventloop.handle();
-    let client_id = id.to_owned();
-    let payloads = generate_payloads(count, payload_size);
+    let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
     task::spawn(async move {
-        requests(&client_id, payloads, requests_tx).await;
+        for _i in 0..count {
+            let payload = vec![0; payload_size];
+            let qos = QoS::AtLeastOnce;
+            client
+                .publish("hello/benchmarks/world", qos, false, payload)
+                .await
+                .unwrap();
+        }
+
         time::delay_for(Duration::from_secs(10)).await;
     });
 
     let mut acks_count = 0;
     let start = Instant::now();
     loop {
-        let (notification, _) = eventloop.poll().await?;
-        let notification = match notification {
-            Some(n) => n,
-            None => continue,
-        };
-
-        match notification {
-            Incoming::PubAck(_puback) => {
-                acks_count += 1;
+        if let Event::Incoming(Incoming::PubAck(_)) = eventloop.poll().await? {
+            acks_count += 1;
+            if acks_count == count {
+                break;
             }
-            _notification => {
-                continue;
-            }
-        };
-
-        if acks_count == count {
-            break;
         }
     }
 
@@ -67,23 +58,4 @@ pub async fn start(id: &str, payload_size: usize, count: usize) -> Result<(), Bo
         id, count, payload_size, throughput,
     );
     Ok(())
-}
-
-async fn requests(id: &str, payloads: Vec<Vec<u8>>, requests_tx: Sender<Request>) {
-    let topic = format!("hello/{}/world", id);
-    // let subscription = rumqttc::Subscribe::new(&topic, QoS::AtLeastOnce);
-    // let _ = requests_tx.send(Request::Subscribe(subscription)).await;
-    for payload in payloads.into_iter() {
-        let publish = PublishRaw::new(&topic, QoS::AtLeastOnce, payload).unwrap();
-        let publish = Request::PublishRaw(publish);
-        if let Err(_) = requests_tx.send(publish).await {
-            break;
-        }
-    }
-
-    time::delay_for(Duration::from_secs(5)).await;
-}
-
-fn generate_payloads(count: usize, payload_size: usize) -> Vec<Vec<u8>> {
-    vec![vec![1; payload_size]; count]
 }

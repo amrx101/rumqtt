@@ -1,11 +1,10 @@
-use async_channel::Sender;
 use tokio::{task, time};
 
-use rumqttc::{self, EventLoop, MqttOptions, Publish, QoS, Request, Subscribe};
+use rumqttc::{self, AsyncClient, Event, Incoming, MqttOptions, QoS};
 use std::error::Error;
 use std::time::Duration;
 
-#[tokio::main(core_threads = 1)]
+#[tokio::main(worker_threads = 1)]
 async fn main() -> Result<(), Box<dyn Error>> {
     pretty_env_logger::init();
     color_backtrace::install();
@@ -13,28 +12,43 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut mqttoptions = MqttOptions::new("test-1", "localhost", 1883);
     mqttoptions.set_keep_alive(5);
 
-    let mut eventloop = EventLoop::new(mqttoptions, 10);
-    let requests_tx = eventloop.handle();
+    let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
     task::spawn(async move {
-        requests(requests_tx).await;
-        time::delay_for(Duration::from_secs(3)).await;
+        requests(client).await;
+        time::sleep(Duration::from_secs(3)).await;
     });
 
     loop {
-        let (incoming, outgoing) = eventloop.poll().await?;
-        println!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
+        match eventloop.poll().await {
+            Ok(Event::Incoming(Incoming::Publish(p))) => {
+                println!("Topic: {}, Payload: {:?}", p.topic, p.payload)
+            }
+            Ok(Event::Incoming(i)) => {
+                println!("Incoming = {:?}", i);
+            }
+            Ok(Event::Outgoing(o)) => println!("Outgoing = {:?}", o),
+            Err(e) => {
+                println!("Error = {:?}", e);
+                continue;
+            }
+        }
     }
 }
 
-async fn requests(requests_tx: Sender<Request>) {
-    let subscription = Subscribe::new("hello/world", QoS::AtMostOnce);
-    let _ = requests_tx.send(Request::Subscribe(subscription)).await;
+async fn requests(client: AsyncClient) {
+    client
+        .subscribe("hello/world", QoS::AtMostOnce)
+        .await
+        .unwrap();
 
-    for i in 0..10 {
-        let publish = Publish::new("hello/world", QoS::AtLeastOnce, vec![i; i as usize]);
-        requests_tx.send(Request::Publish(publish)).await.unwrap();
-        time::delay_for(Duration::from_secs(1)).await;
+    for i in 1..=10 {
+        client
+            .publish("hello/world", QoS::ExactlyOnce, false, vec![i; 1000 * 1024])
+            .await
+            .unwrap();
+
+        time::sleep(Duration::from_secs(1)).await;
     }
 
-    time::delay_for(Duration::from_secs(120)).await;
+    time::sleep(Duration::from_secs(120)).await;
 }

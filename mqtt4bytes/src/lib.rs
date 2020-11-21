@@ -15,6 +15,7 @@ pub use packets::*;
 pub use read::*;
 pub use topic::*;
 
+/// Serialization/Deserialization errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     InvalidConnectReturnCode(u8),
@@ -35,7 +36,7 @@ pub enum Error {
 }
 
 /// Encapsulates all MQTT packet types
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Packet {
     Connect(Connect),
     ConnAck(ConnAck),
