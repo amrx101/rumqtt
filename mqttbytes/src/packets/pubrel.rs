@@ -32,7 +32,7 @@ impl PubRel {
             return 2;
         }
 
-        if protocol == Protocol::V5 {
+        #[cfg(feature="mqtt5")] {
             if let Some(properties) = &self.properties {
                 let properties_len = properties.len();
                 let properties_len_len = len_len(properties_len);
@@ -68,10 +68,13 @@ impl PubRel {
             });
         }
 
-        let properties = match protocol {
-            Protocol::V5 => PubRelProperties::extract(&mut bytes)?,
-            Protocol::V4 => None,
-        };
+        cfg_if::cfg_if! {
+            if #[cfg(feature="mqtt5")] {
+                let properties = PubRelProperties::extract(&mut bytes)?;
+            } else {
+                let properties = None;
+            }
+        }
 
         let puback = PubRel {
             pkid,
@@ -93,7 +96,7 @@ impl PubRel {
 
         buffer.put_u8(self.reason as u8);
 
-        if protocol == Protocol::V5 {
+        #[cfg(feature="mqtt5")] {
             if let Some(properties) = &self.properties {
                 properties.write(buffer)?;
             }

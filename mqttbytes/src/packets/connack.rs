@@ -52,7 +52,7 @@ impl ConnAck {
         let mut len = 1  // sesssion present
                         + 1; // code
 
-        if protocol == Protocol::V5 {
+        #[cfg(feature="mqtt5")] {
             if let Some(properties) = &self.properties {
                 let properties_len = properties.len();
                 let properties_len_len = len_len(properties_len);
@@ -76,10 +76,14 @@ impl ConnAck {
 
         let session_present = (flags & 0x01) == 1;
         let code = connect_return(return_code)?;
-        let properties = match protocol {
-            Protocol::V5 => ConnAckProperties::extract(&mut bytes)?,
-            Protocol::V4 => None,
-        };
+
+        cfg_if::cfg_if! {
+            if #[cfg(feature="mqtt5")] {
+                let properties = ConnAckProperties::extract(&mut bytes)?;
+            } else {
+                let properties = None;
+            }
+        }
 
         let connack = ConnAck {
             session_present,
@@ -98,7 +102,7 @@ impl ConnAck {
         buffer.put_u8(self.session_present as u8);
         buffer.put_u8(self.code as u8);
 
-        if protocol == Protocol::V5 {
+        #[cfg(feature="mqtt5")] {
             if let Some(properties) = &self.properties {
                 properties.write(buffer)?;
             }

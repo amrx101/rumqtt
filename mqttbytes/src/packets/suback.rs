@@ -50,10 +50,13 @@ impl SubAck {
 
         let pkid = read_u16(&mut bytes)?;
 
-        let properties = match protocol {
-            Protocol::V5 => SubAckProperties::extract(&mut bytes)?,
-            Protocol::V4 => None,
-        };
+        cfg_if::cfg_if! {
+            if #[cfg(feature="mqtt5")] {
+                let properties = SubAckProperties::extract(&mut bytes)?;
+            } else {
+                let properties = None;
+            }
+        }
 
         if !bytes.has_remaining() {
             return Err(Error::MalformedPacket);
@@ -81,7 +84,7 @@ impl SubAck {
 
         buffer.put_u16(self.pkid);
 
-        if protocol == Protocol::V5 {
+        #[cfg(feature="mqtt5")]{
             match &self.properties {
                 Some(properties) => properties.write(buffer)?,
                 None => {

@@ -51,7 +51,7 @@ impl Connect {
                               + 1            // connect flags
                               + 2; // keep alive
 
-        if self.protocol == Protocol::V5 {
+       #[cfg(feature="mqtt5")] {
             match &self.properties {
                 Some(properties) => {
                     let properties_len = properties.len();
@@ -199,7 +199,7 @@ impl LastWill {
     fn len(&self, protocol: Protocol) -> usize {
         let mut len = 0;
 
-        if protocol == Protocol::V5 {
+        #[cfg(feature="mqtt5")] {
             match &self.properties {
                 Some(properties) => {
                     let properties_len = properties.len();
@@ -228,11 +228,13 @@ impl LastWill {
             }
             0 => None,
             _ => {
-                // Properties in variable header
-                let properties = match protocol {
-                    Protocol::V5 => WillProperties::read(&mut bytes)?,
-                    Protocol::V4 => None,
-                };
+                cfg_if::cfg_if! {
+                    if #[cfg(feature="mqtt5")] {
+                        let properties = WillProperties::read(&mut bytes)?;
+                    } else {
+                        let properties = None;
+                    }
+                }
 
                 let will_topic = read_mqtt_string(&mut bytes)?;
                 let will_message = read_mqtt_bytes(&mut bytes)?;
@@ -258,7 +260,7 @@ impl LastWill {
             connect_flags |= 0x20;
         }
 
-        if protocol == Protocol::V5 {
+        #[cfg(feature="mqtt5")] {
             match &self.properties {
                 Some(properties) => properties.write(buffer)?,
                 None => {

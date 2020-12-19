@@ -65,15 +65,15 @@ impl Subscribe {
 
     pub fn len(&self, protocol: Protocol) -> usize {
         let mut len = 2 + self.filters.iter().fold(0, |s, t| s + t.len());
-
-        if protocol == Protocol::V5 {
-            if let Some(properties) = &self.properties {
-                let properties_len = properties.len();
-                let properties_len_len = len_len(properties_len);
-                len += properties_len_len + properties_len;
-            } else {
-                // just 1 byte representing 0 len
-                len += 1;
+        cfg_if::cfg_if! {
+            if #[cfg(feature="mqtt5")] {
+                if let Some(properties) = &self.properties {
+                    let properties_len = properties.len();
+                    let properties_len_len = len_len(properties_len);
+                    len += properties_len_len + properties_len;
+                } else {
+                    len += 1;
+                }
             }
         }
 
@@ -89,10 +89,13 @@ impl Subscribe {
         bytes.advance(variable_header_index);
 
         let pkid = read_u16(&mut bytes)?;
-        let properties = match protocol {
-            Protocol::V5 => SubscribeProperties::extract(&mut bytes)?,
-            Protocol::V4 => None,
-        };
+        cfg_if::cfg_if! {
+            if #[cfg(feature="mqtt5")] {
+                let properties = SubscribeProperties::extract(&mut bytes)?;
+            } else {
+                let properties = None;
+            }
+        }
 
         // variable header size = 2 (packet identifier)
         let mut filters = Vec::new();
@@ -145,7 +148,7 @@ impl Subscribe {
         // write packet id
         buffer.put_u16(self.pkid);
 
-        if protocol == Protocol::V5 {
+       #[cfg(feature="mqtt5")] {
             match &self.properties {
                 Some(properties) => properties.write(buffer)?,
                 None => {
