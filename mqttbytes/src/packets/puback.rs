@@ -290,7 +290,8 @@ mod test {
         let puback = v5_sample();
         let mut buf = BytesMut::new();
         puback.write(&mut buf).unwrap();   //V5
-        assert_eq!(&buf[..], v5_sample_bytes());
+        let bytes_recv: Vec<u8> = buf.iter().cloned().collect();
+        assert_eq!(bytes_recv, v5_sample_bytes());
     }
 
     fn v5_sample2() -> PubAck {
@@ -323,7 +324,8 @@ mod test {
         let mut buf = BytesMut::new();
 
         puback.write(&mut buf).unwrap();   //V5
-        assert_eq!(&buf[..], v5_sample2_bytes());
+        let bytes_recv: Vec<u8> = buf.iter().cloned().collect();
+        assert_eq!(bytes_recv, v5_sample2_bytes());
     }
 
     fn v5_sample3() -> PubAck {
@@ -356,6 +358,7 @@ mod test {
         let mut buf = BytesMut::new();
 
         puback.write(&mut buf).unwrap();
-        assert_eq!(&buf[..], v5_sample3_bytes());
+        let bytes_recv: Vec<u8> = buf.iter().cloned().collect();
+        assert_eq!(bytes_recv, v5_sample3_bytes());
     }
 }

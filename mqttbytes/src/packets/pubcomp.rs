@@ -245,6 +245,7 @@ mod test {
         let pubcomp = v5_sample();
         let mut buf = BytesMut::new();
         pubcomp.write(&mut buf).unwrap();
-        assert_eq!(&buf[..], v5_sample_bytes());
+        let bytes_recv: Vec<u8> = buf.iter().cloned().collect();
+        assert_eq!(bytes_recv, v5_sample_bytes());
     }
 }

@@ -490,7 +490,8 @@ mod test {
 
         // println!("{:X?}", buf);
         // println!("{:#04X?}", &buf[..]);
-        assert_eq!(&buf[..], v5_sample_bytes());
+        let bytes_recv: Vec<u8> = buf.iter().cloned().collect();
+        assert_eq!(bytes_recv, v5_sample_bytes());
     }
 
     fn v5_sample2() -> Subscribe {
@@ -530,6 +531,7 @@ mod test {
 
         // println!("{:X?}", buf);
         // println!("{:#04X?}", &buf[..]);
-        assert_eq!(&buf[..], v5_sample2_bytes());
+        let bytes_recv: Vec<u8> = buf.iter().cloned().collect();
+        assert_eq!(bytes_recv, v5_sample2_bytes());
     }
 }

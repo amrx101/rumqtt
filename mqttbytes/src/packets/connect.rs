@@ -961,7 +961,8 @@ mod test {
         let connect = v5_sample();
         let mut buf = BytesMut::new();
         connect.write(&mut buf).unwrap();
-        assert_eq!(&buf[..], v5_sample_bytes());
+        let bytes_recv: Vec<u8> = buf.iter().cloned().collect();
+        assert_eq!(bytes_recv, v5_sample_bytes());
     }
 
     fn v5_sample2() -> Connect {
@@ -1002,7 +1003,8 @@ mod test {
         connect.write(&mut buf).unwrap();
 
         let expected = v5_sample2_bytes();
-        assert_eq!(&buf[..], &expected[0..(expected.len() - 3)]);
+        let bytes_recv: Vec<u8> = buf.iter().cloned().collect();
+        assert_eq!(bytes_recv, &expected[0..(expected.len() - 3)]);
     }
 
     fn sample3() -> Connect {
@@ -1074,7 +1076,8 @@ mod test {
         connect.write(&mut buf).unwrap();
 
         let expected = v5_sample3_bytes();
-        assert_eq!(&buf[..], &expected[0..(expected.len())]);
+        let bytes_recv: Vec<u8> = buf.iter().cloned().collect();
+        assert_eq!(bytes_recv, &expected[0..(expected.len())]);
     }
 
     #[test]

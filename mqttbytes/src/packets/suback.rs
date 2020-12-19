@@ -296,8 +296,7 @@ mod test {
         let mut buf = BytesMut::new();
         publish.write(&mut buf).unwrap();
 
-        // println!("{:X?}", buf);
-        // println!("{:#04X?}", &buf[..]);
-        assert_eq!(&buf[..], v5_sample_bytes());
+        let bytes_recv: Vec<u8> = buf.iter().cloned().collect();
+        assert_eq!(bytes_recv, v5_sample_bytes());
     }
 }

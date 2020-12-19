@@ -556,7 +556,8 @@ mod test {
         let publish = sample_v5();
         let mut buf = BytesMut::new();
         publish.write(&mut buf).unwrap();
-        assert_eq!(&buf[..], sample_v5_bytes());
+        let bytes_recv: Vec<u8> = buf.iter().cloned().collect();
+        assert_eq!(bytes_recv, sample_v5_bytes());
     }
 
     #[test]
