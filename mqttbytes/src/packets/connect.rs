@@ -91,6 +91,7 @@ impl Connect {
             return Err(Error::InvalidProtocol);
         }
 
+        // This needs to be done anyway at runtime.
         let protocol = match protocol_level {
             4 => Protocol::V4,
             5 => Protocol::V5,
@@ -102,10 +103,13 @@ impl Connect {
         let keep_alive = read_u16(&mut bytes)?;
 
         // Properties in variable header
-        let properties = match protocol {
-            Protocol::V5 => ConnectProperties::read(&mut bytes)?,
-            Protocol::V4 => None,
-        };
+        cfg_if::cfg_if! {
+            if #[cfg(feature="mqtt5")] {
+                let properties = ConnectProperties::read(&mut bytes)?;
+            } else {
+                let properties = None;
+            }
+        }
 
         let client_id = read_mqtt_string(&mut bytes)?;
         let last_will = LastWill::read(connect_flags, &mut bytes)?;
@@ -145,7 +149,7 @@ impl Connect {
         buffer.put_u8(connect_flags);
         buffer.put_u16(self.keep_alive);
 
-        if self.protocol == Protocol::V5 {
+        #[cfg(feature="mqtt5")] {
             match &self.properties {
                 Some(properties) => properties.write(buffer)?,
                 None => {
