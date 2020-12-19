@@ -63,7 +63,7 @@ impl Subscribe {
         self
     }
 
-    pub fn len(&self, protocol: Protocol) -> usize {
+    pub fn len(&self) -> usize {
         let mut len = 2 + self.filters.iter().fold(0, |s, t| s + t.len());
         cfg_if::cfg_if! {
             if #[cfg(feature="mqtt5")] {
@@ -82,8 +82,7 @@ impl Subscribe {
 
     pub fn read(
         fixed_header: FixedHeader,
-        mut bytes: Bytes,
-        protocol: Protocol,
+        mut bytes: Bytes
     ) -> Result<Self, Error> {
         let variable_header_index = fixed_header.fixed_header_len;
         bytes.advance(variable_header_index);
@@ -137,12 +136,12 @@ impl Subscribe {
         Ok(subscribe)
     }
 
-    pub fn write(&self, buffer: &mut BytesMut, protocol: Protocol) -> Result<usize, Error> {
+    pub fn write(&self, buffer: &mut BytesMut) -> Result<usize, Error> {
         // write packet type
         buffer.put_u8(0x82);
 
         // write remaining length
-        let remaining_len = self.len(protocol);
+        let remaining_len = self.len();
         let remaining_len_bytes = write_remaining_length(buffer, remaining_len)?;
 
         // write packet id
@@ -378,7 +377,7 @@ mod test {
         let mut stream = BytesMut::from(&stream[..]);
         let fixed_header = parse_fixed_header(stream.iter()).unwrap();
         let subscribe_bytes = stream.split_to(fixed_header.frame_length()).freeze();
-        let packet = Subscribe::read(fixed_header, subscribe_bytes, Protocol::V4).unwrap();
+        let packet = Subscribe::read(fixed_header, subscribe_bytes).unwrap();
 
         assert_eq!(
             packet,
@@ -407,7 +406,7 @@ mod test {
         };
 
         let mut buf = BytesMut::new();
-        subscribe.write(&mut buf, Protocol::V4).unwrap();
+        subscribe.write(&mut buf).unwrap();
         assert_eq!(
             buf,
             vec![
@@ -479,7 +478,7 @@ mod test {
 
         let fixed_header = parse_fixed_header(stream.iter()).unwrap();
         let subscribe_bytes = stream.split_to(fixed_header.frame_length()).freeze();
-        let subscribe = Subscribe::read(fixed_header, subscribe_bytes, Protocol::V5).unwrap();
+        let subscribe = Subscribe::read(fixed_header, subscribe_bytes).unwrap();
         assert_eq!(subscribe, v5_sample());
     }
 
@@ -487,7 +486,7 @@ mod test {
     fn v5_subscribe_encoding_works() {
         let publish = v5_sample();
         let mut buf = BytesMut::new();
-        publish.write(&mut buf, Protocol::V5).unwrap();
+        publish.write(&mut buf).unwrap();
 
         // println!("{:X?}", buf);
         // println!("{:#04X?}", &buf[..]);
@@ -519,7 +518,7 @@ mod test {
 
         let fixed_header = parse_fixed_header(stream.iter()).unwrap();
         let subscribe_bytes = stream.split_to(fixed_header.frame_length()).freeze();
-        let subscribe = Subscribe::read(fixed_header, subscribe_bytes, Protocol::V5).unwrap();
+        let subscribe = Subscribe::read(fixed_header, subscribe_bytes).unwrap();
         assert_eq!(subscribe, v5_sample2());
     }
 
@@ -527,7 +526,7 @@ mod test {
     fn v5_subscribe2_encoding_works() {
         let publish = v5_sample2();
         let mut buf = BytesMut::new();
-        publish.write(&mut buf, Protocol::V5).unwrap();
+        publish.write(&mut buf).unwrap();
 
         // println!("{:X?}", buf);
         // println!("{:#04X?}", &buf[..]);

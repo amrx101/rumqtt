@@ -20,10 +20,10 @@ impl SubAck {
         }
     }
 
-    pub fn len(&self, protocol: Protocol) -> usize {
+    pub fn len(&self) -> usize {
         let mut len = 2 + self.return_codes.len();
 
-        if protocol == Protocol::V5 {
+        #[cfg(feature="mqtt5")] {
             match &self.properties {
                 Some(properties) => {
                     let properties_len = properties.len();
@@ -42,8 +42,7 @@ impl SubAck {
 
     pub fn read(
         fixed_header: FixedHeader,
-        mut bytes: Bytes,
-        protocol: Protocol,
+        mut bytes: Bytes
     ) -> Result<Self, Error> {
         let variable_header_index = fixed_header.fixed_header_len;
         bytes.advance(variable_header_index);
@@ -77,9 +76,9 @@ impl SubAck {
         Ok(suback)
     }
 
-    pub fn write(&self, buffer: &mut BytesMut, protocol: Protocol) -> Result<usize, Error> {
+    pub fn write(&self, buffer: &mut BytesMut) -> Result<usize, Error> {
         buffer.put_u8(0x90);
-        let remaining_len = self.len(protocol);
+        let remaining_len = self.len();
         let remaining_len_bytes = write_remaining_length(buffer, remaining_len)?;
 
         buffer.put_u16(self.pkid);
@@ -237,7 +236,7 @@ mod test {
         let mut stream = BytesMut::from(&stream[..]);
         let fixed_header = parse_fixed_header(stream.iter()).unwrap();
         let ack_bytes = stream.split_to(fixed_header.frame_length()).freeze();
-        let packet = SubAck::read(fixed_header, ack_bytes, Protocol::V4).unwrap();
+        let packet = SubAck::read(fixed_header, ack_bytes).unwrap();
 
         assert_eq!(
             packet,
@@ -287,7 +286,7 @@ mod test {
         stream.extend_from_slice(&packetstream[..]);
         let fixed_header = parse_fixed_header(stream.iter()).unwrap();
         let suback_bytes = stream.split_to(fixed_header.frame_length()).freeze();
-        let suback = SubAck::read(fixed_header, suback_bytes, Protocol::V5).unwrap();
+        let suback = SubAck::read(fixed_header, suback_bytes).unwrap();
         assert_eq!(suback, v5_sample());
     }
 
@@ -295,7 +294,7 @@ mod test {
     fn v5_suback_encoding_works() {
         let publish = v5_sample();
         let mut buf = BytesMut::new();
-        publish.write(&mut buf, Protocol::V5).unwrap();
+        publish.write(&mut buf).unwrap();
 
         // println!("{:X?}", buf);
         // println!("{:#04X?}", &buf[..]);

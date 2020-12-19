@@ -26,7 +26,7 @@ impl PubRel {
         }
     }
 
-    fn len(&self, protocol: Protocol) -> usize {
+    fn len(&self) -> usize {
         let mut len = 2 + 1; // pkid + reason
         if self.reason == PubRelReason::Success && self.properties.is_none() {
             return 2;
@@ -45,8 +45,7 @@ impl PubRel {
 
     pub fn read(
         fixed_header: FixedHeader,
-        mut bytes: Bytes,
-        protocol: Protocol,
+        mut bytes: Bytes
     ) -> Result<Self, Error> {
         let variable_header_index = fixed_header.fixed_header_len;
         bytes.advance(variable_header_index);
@@ -85,8 +84,8 @@ impl PubRel {
         Ok(puback)
     }
 
-    pub fn write(&self, buffer: &mut BytesMut, protocol: Protocol) -> Result<usize, Error> {
-        let len = self.len(protocol);
+    pub fn write(&self, buffer: &mut BytesMut) -> Result<usize, Error> {
+        let len = self.len();
         buffer.put_u8(0x62);
         let count = write_remaining_length(buffer, len)?;
         buffer.put_u16(self.pkid);
@@ -235,7 +234,7 @@ mod test {
 
         let fixed_header = parse_fixed_header(stream.iter()).unwrap();
         let pubrel_bytes = stream.split_to(fixed_header.frame_length()).freeze();
-        let pubrel = PubRel::read(fixed_header, pubrel_bytes, Protocol::V5).unwrap();
+        let pubrel = PubRel::read(fixed_header, pubrel_bytes).unwrap();
         assert_eq!(pubrel, v5_sample());
     }
 
@@ -243,7 +242,7 @@ mod test {
     fn v5_pubrel_encoding_works() {
         let pubrel = v5_sample();
         let mut buf = BytesMut::new();
-        pubrel.write(&mut buf, Protocol::V5).unwrap();
+        pubrel.write(&mut buf).unwrap();
         assert_eq!(&buf[..], v5_sample_bytes());
     }
 }

@@ -41,13 +41,13 @@ impl Publish {
         }
     }
 
-    fn len(&self, protocol: Protocol) -> usize {
+    fn len(&self) -> usize {
         let mut len = 2 + self.topic.len();
         if self.qos != QoS::AtMostOnce && self.pkid != 0 {
             len += 2;
         }
 
-        if protocol == Protocol::V5 {
+        #[cfg(feature="mqtt5")] {
             match &self.properties {
                 Some(properties) => {
                     let properties_len = properties.len();
@@ -67,8 +67,7 @@ impl Publish {
 
     pub fn read(
         fixed_header: FixedHeader,
-        mut bytes: Bytes,
-        protocol: Protocol,
+        mut bytes: Bytes
     ) -> Result<Self, Error> {
         let qos = qos((fixed_header.byte1 & 0b0110) >> 1)?;
         let dup = (fixed_header.byte1 & 0b1000) != 0;
@@ -113,8 +112,8 @@ impl Publish {
         Ok(publish)
     }
 
-    pub fn write(&self, buffer: &mut BytesMut, protocol: Protocol) -> Result<usize, Error> {
-        let len = self.len(protocol);
+    pub fn write(&self, buffer: &mut BytesMut) -> Result<usize, Error> {
+        let len = self.len();
 
         let dup = self.dup as u8;
         let qos = self.qos as u8;
@@ -374,7 +373,7 @@ mod test {
         let mut stream = BytesMut::from(&stream[..]);
         let fixed_header = parse_fixed_header(stream.iter()).unwrap();
         let publish_bytes = stream.split_to(fixed_header.frame_length()).freeze();
-        let packet = Publish::read(fixed_header, publish_bytes, Protocol::V4).unwrap();
+        let packet = Publish::read(fixed_header, publish_bytes).unwrap();
 
         let payload = &[0xF1, 0xF2, 0xF3, 0xF4];
         assert_eq!(
@@ -412,7 +411,7 @@ mod test {
         let mut stream = BytesMut::from(&stream[..]);
         let fixed_header = parse_fixed_header(stream.iter()).unwrap();
         let publish_bytes = stream.split_to(fixed_header.frame_length()).freeze();
-        let packet = Publish::read(fixed_header, publish_bytes, Protocol::V4).unwrap();
+        let packet = Publish::read(fixed_header, publish_bytes).unwrap();
 
         assert_eq!(
             packet,
@@ -441,7 +440,7 @@ mod test {
         };
 
         let mut buf = BytesMut::new();
-        publish.write(&mut buf, Protocol::V4).unwrap();
+        publish.write(&mut buf).unwrap();
 
         assert_eq!(
             buf,
@@ -476,7 +475,7 @@ mod test {
         };
 
         let mut buf = BytesMut::new();
-        publish.write(&mut buf, Protocol::V4).unwrap();
+        publish.write(&mut buf).unwrap();
 
         assert_eq!(
             buf,
@@ -548,7 +547,7 @@ mod test {
 
         let fixed_header = parse_fixed_header(stream.iter()).unwrap();
         let publish_bytes = stream.split_to(fixed_header.frame_length()).freeze();
-        let publish = Publish::read(fixed_header, publish_bytes, Protocol::V5).unwrap();
+        let publish = Publish::read(fixed_header, publish_bytes).unwrap();
         assert_eq!(publish, sample_v5());
     }
 
@@ -556,7 +555,7 @@ mod test {
     fn v5_publish_encoding_works() {
         let publish = sample_v5();
         let mut buf = BytesMut::new();
-        publish.write(&mut buf, Protocol::V5).unwrap();
+        publish.write(&mut buf).unwrap();
         assert_eq!(&buf[..], sample_v5_bytes());
     }
 

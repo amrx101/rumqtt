@@ -69,7 +69,7 @@ impl Connect {
 
         // last will len
         if let Some(last_will) = &self.last_will {
-            len += last_will.len(self.protocol);
+            len += last_will.len();
         }
 
         // username and password len
@@ -108,7 +108,7 @@ impl Connect {
         };
 
         let client_id = read_mqtt_string(&mut bytes)?;
-        let last_will = LastWill::read(connect_flags, &mut bytes, protocol)?;
+        let last_will = LastWill::read(connect_flags, &mut bytes)?;
         let login = Login::read(connect_flags, &mut bytes)?;
 
         let connect = Connect {
@@ -157,7 +157,7 @@ impl Connect {
         write_mqtt_string(buffer, &self.client_id);
 
         if let Some(last_will) = &self.last_will {
-            connect_flags |= last_will.write(buffer, self.protocol)?;
+            connect_flags |= last_will.write(buffer)?;
         }
 
         if let Some(login) = &self.login {
@@ -196,7 +196,7 @@ impl LastWill {
         }
     }
 
-    fn len(&self, protocol: Protocol) -> usize {
+    fn len(&self) -> usize {
         let mut len = 0;
 
         #[cfg(feature="mqtt5")] {
@@ -219,8 +219,7 @@ impl LastWill {
 
     fn read(
         connect_flags: u8,
-        mut bytes: &mut Bytes,
-        protocol: Protocol,
+        mut bytes: &mut Bytes
     ) -> Result<Option<LastWill>, Error> {
         let last_will = match connect_flags & 0b100 {
             0 if (connect_flags & 0b0011_1000) != 0 => {
@@ -252,7 +251,7 @@ impl LastWill {
         Ok(last_will)
     }
 
-    fn write(&self, buffer: &mut BytesMut, protocol: Protocol) -> Result<u8, Error> {
+    fn write(&self, buffer: &mut BytesMut) -> Result<u8, Error> {
         let mut connect_flags = 0;
 
         connect_flags |= 0x04 | (self.qos as u8) << 3;

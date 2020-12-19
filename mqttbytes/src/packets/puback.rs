@@ -33,7 +33,7 @@ impl PubAck {
         }
     }
 
-    fn len(&self, protocol: Protocol) -> usize {
+    fn len(&self) -> usize {
         let mut len = 2 + 1; // pkid + reason
 
         if self.reason == PubAckReason::Success && self.properties.is_none() {
@@ -54,11 +54,7 @@ impl PubAck {
         len
     }
 
-    pub fn read(
-        fixed_header: FixedHeader,
-        mut bytes: Bytes,
-        protocol: Protocol,
-    ) -> Result<Self, Error> {
+    pub fn read(fixed_header: FixedHeader, mut bytes: Bytes) -> Result<Self, Error> {
         let variable_header_index = fixed_header.fixed_header_len;
         bytes.advance(variable_header_index);
         let pkid = read_u16(&mut bytes)?;
@@ -99,8 +95,8 @@ impl PubAck {
         Ok(puback)
     }
 
-    pub fn write(&self, buffer: &mut BytesMut, protocol: Protocol) -> Result<usize, Error> {
-        let len = self.len(protocol);
+    pub fn write(&self, buffer: &mut BytesMut) -> Result<usize, Error> {
+        let len = self.len();
         buffer.put_u8(0x40);
 
         let count = write_remaining_length(buffer, len)?;
@@ -239,7 +235,7 @@ mod test {
         let mut stream = BytesMut::from(&stream[..]);
         let fixed_header = parse_fixed_header(stream.iter()).unwrap();
         let ack_bytes = stream.split_to(fixed_header.frame_length()).freeze();
-        let packet = PubAck::read(fixed_header, ack_bytes, Protocol::V4).unwrap();
+        let packet = PubAck::read(fixed_header, ack_bytes).unwrap();  //V4
 
         assert_eq!(
             packet,
@@ -285,7 +281,7 @@ mod test {
 
         let fixed_header = parse_fixed_header(stream.iter()).unwrap();
         let puback_bytes = stream.split_to(fixed_header.frame_length()).freeze();
-        let puback = PubAck::read(fixed_header, puback_bytes, Protocol::V5).unwrap();
+        let puback = PubAck::read(fixed_header, puback_bytes).unwrap();   //V5
         assert_eq!(puback, v5_sample());
     }
 
@@ -293,7 +289,7 @@ mod test {
     fn v5_puback_encoding_works() {
         let puback = v5_sample();
         let mut buf = BytesMut::new();
-        puback.write(&mut buf, Protocol::V5).unwrap();
+        puback.write(&mut buf).unwrap();   //V5
         assert_eq!(&buf[..], v5_sample_bytes());
     }
 
@@ -317,7 +313,7 @@ mod test {
 
         let fixed_header = parse_fixed_header(stream.iter()).unwrap();
         let puback_bytes = stream.split_to(fixed_header.frame_length()).freeze();
-        let puback = PubAck::read(fixed_header, puback_bytes, Protocol::V5).unwrap();
+        let puback = PubAck::read(fixed_header, puback_bytes).unwrap();  //V5
         assert_eq!(puback, v5_sample2());
     }
 
@@ -326,7 +322,7 @@ mod test {
         let puback = v5_sample2();
         let mut buf = BytesMut::new();
 
-        puback.write(&mut buf, Protocol::V5).unwrap();
+        puback.write(&mut buf).unwrap();   //V5
         assert_eq!(&buf[..], v5_sample2_bytes());
     }
 
@@ -350,7 +346,7 @@ mod test {
 
         let fixed_header = parse_fixed_header(stream.iter()).unwrap();
         let puback_bytes = stream.split_to(fixed_header.frame_length()).freeze();
-        let puback = PubAck::read(fixed_header, puback_bytes, Protocol::V5).unwrap();
+        let puback = PubAck::read(fixed_header, puback_bytes).unwrap();
         assert_eq!(puback, v5_sample3());
     }
 
@@ -359,7 +355,7 @@ mod test {
         let puback = v5_sample3();
         let mut buf = BytesMut::new();
 
-        puback.write(&mut buf, Protocol::V5).unwrap();
+        puback.write(&mut buf).unwrap();
         assert_eq!(&buf[..], v5_sample3_bytes());
     }
 }
