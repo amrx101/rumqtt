@@ -87,11 +87,18 @@ impl Publish {
         if qos != QoS::AtMostOnce && pkid == 0 {
             return Err(Error::PacketIdZero);
         }
-
-        let properties = match protocol {
-            Protocol::V5 => PublishProperties::extract(&mut bytes)?,
-            Protocol::V4 => None,
-        };
+       
+        cfg_if::cfg_if! {
+            if #[cfg(feature="mqtt5")] {
+                let properties = PublishProperties::extract(&mut bytes)?;
+            } else {
+                let properties = None;
+            }
+        }
+        // let properties: Option<PublishProperties> = None;
+        // #[cfg(feature="mqtt5")]
+        // let properties = PublishProperties::extract(&mut bytes)?;
+        
 
         let publish = Publish {
             dup,
@@ -126,14 +133,15 @@ impl Publish {
             buffer.put_u16(pkid);
         }
 
-        if protocol == Protocol::V5 {
-            match &self.properties {
-                Some(properties) => properties.write(buffer)?,
-                None => {
-                    write_remaining_length(buffer, 0)?;
-                }
-            };
-        }
+        
+        #[cfg(feature="mqtt5")]
+        match &self.properties {
+            Some(properties) => properties.write(buffer)?,
+            None => {
+                write_remaining_length(buffer, 0)?;
+            }
+        };
+        
 
         buffer.extend_from_slice(&self.payload);
 

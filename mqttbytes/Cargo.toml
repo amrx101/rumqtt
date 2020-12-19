@@ -9,11 +9,15 @@ description = "MQTT 4/5 serialization and deserialization"
 keywords = ["mqtt"]
 categories = ["network-programming", "no-std"]
 
+[features]
+mqtt5 = []
+
 [lib]
 bench = false
 
 [dependencies]
 bytes = { version = "0.6", default-features = false }
+cfg-if = "1.0.0"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
