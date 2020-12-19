@@ -39,15 +39,15 @@ impl PubAck {
         if self.reason == PubAckReason::Success && self.properties.is_none() {
             return 2;
         }
-
-        if protocol == Protocol::V5 {
+        
+        #[cfg(feature="mqtt5")] {
             if let Some(properties) = &self.properties {
                 let properties_len = properties.len();
                 let properties_len_len = len_len(properties_len);
                 len += properties_len_len + properties_len;
             }
-        }
-
+        } 
+        
         // Unlike other packets, property length can be ignored if there are
         // no properties in acks
 
@@ -82,10 +82,13 @@ impl PubAck {
             });
         }
 
-        let properties = match protocol {
-            Protocol::V5 => PubAckProperties::extract(&mut bytes)?,
-            Protocol::V4 => None,
-        };
+        cfg_if::cfg_if! {
+            if #[cfg(feature="mqtt5")] {
+                let properties = PubAckProperties::extract(&mut bytes)?;
+            } else {
+                let properties = None;
+            }
+        }
 
         let puback = PubAck {
             pkid,
@@ -108,12 +111,12 @@ impl PubAck {
         }
 
         buffer.put_u8(self.reason as u8);
-
-        if protocol == Protocol::V5 {
-            if let Some(properties) = &self.properties {
-                properties.write(buffer)?;
-            }
+ 
+        #[cfg(feature="mqtt5")]
+        if let Some(properties) = &self.properties {
+            properties.write(buffer)?;
         }
+       
 
         Ok(1 + count + len)
     }
