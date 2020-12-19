@@ -219,7 +219,7 @@ impl Network {
 
     pub async fn connack(&mut self, connack: ConnAck) -> Result<usize, io::Error> {
         let mut write = BytesMut::new();
-        let len = match connack.write(&mut write, self.protocol) {
+        let len = match connack.write(&mut write) {
             Ok(size) => size,
             Err(e) => return Err(io::Error::new(io::ErrorKind::InvalidData, e.to_string())),
         };
@@ -246,7 +246,7 @@ impl Network {
     pub async fn readb(&mut self, incoming: &mut VecDeque<Incoming>) -> Result<(), io::Error> {
         let mut count = 0;
         loop {
-            match mqttbytes::read(&mut self.read, self.protocol, self.max_incoming_size) {
+            match mqttbytes::read(&mut self.read,  self.max_incoming_size) {
                 Ok(packet) => {
                     incoming.push_back(packet);
                     count += 1;
@@ -269,8 +269,8 @@ impl Network {
     async fn write(&mut self, packet: Packet) -> Result<Outgoing, Error> {
         let outgoing = outgoing(&packet);
         match packet {
-            Packet::Publish(packet) => packet.write(&mut self.write, self.protocol)?,
-            Packet::PubRel(packet) => packet.write(&mut self.write, self.protocol)?,
+            Packet::Publish(packet) => packet.write(&mut self.write)?,
+            Packet::PubRel(packet) => packet.write(&mut self.write)?,
             Packet::PingReq => {
                 let packet = PingReq;
                 packet.write(&mut self.write)?
@@ -279,17 +279,17 @@ impl Network {
                 let packet = PingResp;
                 packet.write(&mut self.write)?
             }
-            Packet::Subscribe(packet) => packet.write(&mut self.write, self.protocol)?,
-            Packet::SubAck(packet) => packet.write(&mut self.write, self.protocol)?,
+            Packet::Subscribe(packet) => packet.write(&mut self.write)?,
+            Packet::SubAck(packet) => packet.write(&mut self.write)?,
             Packet::Unsubscribe(packet) => packet.write(&mut self.write)?,
             Packet::UnsubAck(packet) => packet.write(&mut self.write)?,
             Packet::Disconnect => {
                 let packet = Disconnect;
                 packet.write(&mut self.write)?
             }
-            Packet::PubAck(packet) => packet.write(&mut self.write, self.protocol)?,
-            Packet::PubRec(packet) => packet.write(&mut self.write, self.protocol)?,
-            Packet::PubComp(packet) => packet.write(&mut self.write, self.protocol)?,
+            Packet::PubAck(packet) => packet.write(&mut self.write)?,
+            Packet::PubRec(packet) => packet.write(&mut self.write)?,
+            Packet::PubComp(packet) => packet.write(&mut self.write)?,
             _ => unimplemented!(),
         };
 

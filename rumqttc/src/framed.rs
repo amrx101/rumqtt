@@ -62,7 +62,7 @@ impl Network {
     pub async fn read(&mut self) -> Result<Incoming, io::Error> {
         loop {
             let required =
-                match mqttbytes::read(&mut self.read, self.protocol, self.max_incoming_size) {
+                match mqttbytes::read(&mut self.read, self.max_incoming_size) {
                     Ok(packet) => return Ok(packet),
                     Err(mqttbytes::Error::InsufficientBytes(required)) => required,
                     Err(e) => {
@@ -81,7 +81,7 @@ impl Network {
     pub async fn readb(&mut self, state: &mut MqttState) -> Result<(), StateError> {
         let mut count = 0;
         loop {
-            match mqttbytes::read(&mut self.read, self.protocol, self.max_incoming_size) {
+            match mqttbytes::read(&mut self.read, self.max_incoming_size) {
                 Ok(packet) => {
                     state.handle_incoming_packet(packet)?;
 
